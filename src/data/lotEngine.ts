@@ -48,7 +48,9 @@ export function buildPortfolioSnapshot(transactions: Transaction[]): PortfolioSn
       case 'SELL': {
         if (!symbol) break
         const proceeds = new Decimal(Math.abs(amount))
-        let sharesToSell = new Decimal(Math.abs(quantity))
+        // Save the original total shares so per-lot proceeds allocate correctly
+        const totalSharesToSell = new Decimal(Math.abs(quantity))
+        let sharesToSell = totalSharesToSell
         const lots = lotBook[symbol] || []
 
         // FIFO: consume oldest lots first
@@ -57,7 +59,8 @@ export function buildPortfolioSnapshot(transactions: Transaction[]): PortfolioSn
           const lot = lots[i]
           const lotShares = new Decimal(lot.shares)
           const consumed = Decimal.min(lotShares, sharesToSell)
-          const lotProceeds = proceeds.times(consumed).div(sharesToSell)
+          // Allocate proceeds proportionally to the ORIGINAL total, not the remaining
+          const lotProceeds = proceeds.times(consumed).div(totalSharesToSell)
           const lotCost = consumed.times(lot.costPerShare)
           const pnl = lotProceeds.minus(lotCost)
 

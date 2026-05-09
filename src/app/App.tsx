@@ -33,10 +33,11 @@ export default function App() {
     loadFromLocalStorage()
   }, [])
 
-  // Fetch benchmarks whenever we have a snapshot
+  // Fetch benchmarks whenever we have a snapshot or the API key changes
+  // (Finnhub key unlocks fallback benchmark source if Stooq is unavailable)
   useEffect(() => {
-    fetchBenchmarks().then(setBenchmarks).catch(console.warn)
-  }, [snapshot?.positions?.length])
+    fetchBenchmarks(finnhubKey || undefined).then(setBenchmarks).catch(console.warn)
+  }, [snapshot?.positions?.length, finnhubKey])
 
   // Fetch live quotes after snapshot loads or API key changes
   const symbolsKey = snapshot?.positions.map(p => p.symbol).sort().join(',') ?? ''

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Transaction, PortfolioSnapshot, ParseResult, BenchmarkData } from '../data/types'
+import { parseCSV } from '../data/csvParser'
 
 const RAW_CSV_KEY = 'rhd:csv'
 const SNAPSHOT_KEY = 'rhd:snapshot'
@@ -91,7 +92,14 @@ export const usePortfolioStore = create<PortfolioStore>((set, get) => ({
     if (csv && snapshotRaw) {
       const snapshot = deserializeSnapshot(snapshotRaw)
       if (snapshot) {
-        set({ rawCSV: csv, snapshot })
+        // Re-parse the CSV so transactions are available for XIRR and other metrics
+        try {
+          const parseResult = parseCSV(csv)
+          set({ rawCSV: csv, snapshot, transactions: parseResult.transactions, parseResult })
+        } catch {
+          // Parsing failed (shouldn't happen if CSV was valid before), restore without transactions
+          set({ rawCSV: csv, snapshot })
+        }
       }
     }
   },

@@ -16,7 +16,9 @@ export function Hero() {
     netInvested, positions, firstActivityDate,
   } = snapshot
 
-  const dollarGain = totalValue + realizedPnl + dividendsReceived - netInvested
+  // totalValue already includes cash (which holds realized proceeds + dividends),
+  // so total gain = current account value minus net deposits — no double-counting
+  const dollarGain = totalValue - netInvested
   const pctGain = netInvested > 0 ? (dollarGain / netInvested) * 100 : 0
 
   // XIRR

@@ -21,13 +21,22 @@ export function RiskSection() {
     const qqqRets = benchmarkDailyReturns(benchmarks, 'qqq', fromDate, toDate)
     const qqqMap: Record<string, number> = {}
     qqqRets.forEach((r) => { qqqMap[r.date] = r.return })
+
+    // Without per-symbol daily price history we proxy portfolio returns with SPY.
+    // This means Beta will always be ~1.0 and Alpha ~0% — those tiles show "—" below.
+    // Vol / Sharpe / MaxDD will reflect SPY, which is a rough market approximation.
     return spyRets.map((r) => ({
       date: r.date,
-      portfolioReturn: r.return, // proxy: use SPY as portfolio (best available without per-symbol history)
+      portfolioReturn: r.return,
       spyReturn: r.return,
       qqqReturn: qqqMap[r.date],
     }))
   }, [benchmarks, snapshot])
+
+  // Detect when we're using a pure SPY proxy (no real portfolio daily series)
+  // In that case, Beta/Alpha/R²/TE are trivially 1/0/100%/0 — don't show them
+  const usingSpyProxy = dailyReturns.length > 0 &&
+    dailyReturns.every((d) => d.portfolioReturn === d.spyReturn)
 
   const risk = useMemo(() => computeRiskMetrics(dailyReturns, snapshot?.totalValue ?? 0, rfRate), [dailyReturns, snapshot, rfRate])
 
@@ -58,6 +67,23 @@ export function RiskSection() {
   return (
     <section style={{ padding: '0 32px 32px' }}>
       <span className="section-title" style={{ display: 'block', marginBottom: 16 }}>Risk</span>
+
+      {/* SPY proxy disclaimer */}
+      {usingSpyProxy && (
+        <div style={{
+          background: 'rgba(255,183,0,0.08)', border: '1px solid rgba(255,183,0,0.25)',
+          borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>⚠</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+            <strong style={{ color: 'var(--text-1)' }}>Portfolio return series estimated from SPY.</strong>{' '}
+            Without per-symbol daily price history, Vol, Sharpe, Sortino and Max Drawdown reflect market-level returns rather than your actual portfolio.
+            Beta, Alpha, R², and Tracking Error are hidden because they would be trivially identical to the benchmark.
+            Connect a Finnhub API key in Settings to enable live quotes.
+          </span>
+        </div>
+      )}
 
       {/* 6 risk metric tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
@@ -90,8 +116,8 @@ export function RiskSection() {
         />
         <MetricTile
           title="Beta vs SPY"
-          value={risk.beta !== null ? risk.beta.toFixed(2) : naDisplay}
-          context="1.0 = moves with market · <1 defensive · >1 amplified exposure"
+          value={usingSpyProxy || risk.beta === null ? naDisplay : risk.beta.toFixed(2)}
+          context={usingSpyProxy ? 'Needs per-symbol daily returns — unavailable with SPY proxy' : '1.0 = moves with market · <1 defensive · >1 amplified exposure'}
         />
         <MetricTile
           title="Max Drawdown"
@@ -110,19 +136,19 @@ export function RiskSection() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         <MetricTile
           title="Alpha vs SPY"
-          value={risk.alpha !== null ? fmtPct(risk.alpha * 100, { sign: true }) : naDisplay}
-          context="Annualized excess return after adjusting for market exposure"
-          badge={risk.alpha !== null ? (risk.alpha > 0 ? 'good' : 'bad') : null}
+          value={usingSpyProxy || risk.alpha === null ? naDisplay : fmtPct(risk.alpha * 100, { sign: true })}
+          context={usingSpyProxy ? 'Needs per-symbol daily returns — unavailable with SPY proxy' : 'Annualized excess return after adjusting for market exposure'}
+          badge={!usingSpyProxy && risk.alpha !== null ? (risk.alpha > 0 ? 'good' : 'bad') : null}
         />
         <MetricTile
           title="R² vs SPY"
-          value={risk.rSquared !== null ? (risk.rSquared * 100).toFixed(0) + '%' : naDisplay}
-          context="Share of variance explained by the market — high R² ≈ you own the index"
+          value={usingSpyProxy || risk.rSquared === null ? naDisplay : (risk.rSquared * 100).toFixed(0) + '%'}
+          context={usingSpyProxy ? 'Needs per-symbol daily returns — unavailable with SPY proxy' : 'Share of variance explained by the market — high R² ≈ you own the index'}
         />
         <MetricTile
           title="Tracking Error"
-          value={risk.trackingError !== null ? fmtPct(risk.trackingError * 100, { sign: false }) : naDisplay}
-          context="<1% index-like · 4–8% active · >10% high active risk"
+          value={usingSpyProxy || risk.trackingError === null ? naDisplay : fmtPct(risk.trackingError * 100, { sign: false })}
+          context={usingSpyProxy ? 'Needs per-symbol daily returns — unavailable with SPY proxy' : '<1% index-like · 4–8% active · >10% high active risk'}
         />
         {concentration && (
           <MetricTile

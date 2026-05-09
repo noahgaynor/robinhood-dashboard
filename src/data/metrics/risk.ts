@@ -57,8 +57,11 @@ export function computeRiskMetrics(
     }
   }
 
+  // Build aligned pairs — only include days where BOTH series have data
+  const aligned = dailyReturns.filter((d) => d.spyReturn !== undefined)
   const portReturns = dailyReturns.map((d) => d.portfolioReturn)
-  const spyReturns = dailyReturns.map((d) => d.spyReturn ?? 0).filter((_, i) => dailyReturns[i].spyReturn !== undefined)
+  const alignedPort = aligned.map((d) => d.portfolioReturn)
+  const spyReturns = aligned.map((d) => d.spyReturn as number)
   const hasSpy = spyReturns.length >= 30
 
   const vol = stdev(portReturns) * SQRT252
@@ -111,8 +114,9 @@ export function computeRiskMetrics(
   let trackingError: number | null = null
 
   if (hasSpy && spyReturns.length > 20) {
-    const n = Math.min(portReturns.length, spyReturns.length)
-    const p = portReturns.slice(-n)
+    // alignedPort and spyReturns are already the same length and date-aligned
+    const n = Math.min(alignedPort.length, spyReturns.length)
+    const p = alignedPort.slice(-n)
     const s = spyReturns.slice(-n)
 
     const varSpy = stdev(s) ** 2

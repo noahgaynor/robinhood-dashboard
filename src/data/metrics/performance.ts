@@ -119,12 +119,9 @@ export function computePerformanceMetrics(
 ): PerformanceMetrics {
   const { totalValue, netInvested, realizedPnl, unrealizedPnl, dividendsReceived, closedTrades } = snapshot
 
-  const totalReturn = totalValue - netInvested + realizedPnl - unrealizedPnl +
-    // Actually: totalReturn = (current value + realized + dividends) - net invested
-    // But netInvested is already accounted for in totalValue via cost basis
-    // Simpler: total dollar gain = totalValue - netInvested + realizedPnl + dividendsReceived
-    0 // computed below
-  const dollarGain = totalValue + realizedPnl + dividendsReceived - netInvested
+  // totalValue already includes cash (realized proceeds + dividends live in cash),
+  // so total gain = current account value minus net deposits
+  const dollarGain = totalValue - netInvested
   const totalReturnPct = netInvested > 0 ? (dollarGain / netInvested) * 100 : 0
 
   const today = new Date()
